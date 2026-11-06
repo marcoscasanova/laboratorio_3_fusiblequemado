@@ -1,0 +1,83 @@
+\documentclass[border=8pt]{standalone}
+\usepackage[T1]{fontenc}
+\usepackage[european]{circuitikz}
+\begin{document}
+\begin{circuitikz}[font=\footnotesize]
+  \tikzset{mod/.style={draw, thick, fill=gray!8}, pin/.style={font=\scriptsize}}
+
+  % Arduino Mega
+  \draw[mod] (0,0) rectangle (3.2,11.2);
+  \node[align=center, font=\small\bfseries] at (1.4,5.6) {Arduino\\Mega 2560};
+  \foreach \y/\t in {10/D2, 8/D3, 6.4/D4, 5.8/D5, 4/A0, 2/SDA (20), 1.4/SCL (21)} {\node[pin, anchor=east] at (3.15,\y) {\t};}
+  \node[pin, anchor=west] at (0.05,10.6) {5V};
+  \node[pin, anchor=west] at (0.05,0.6) {GND};
+  \draw (0,10.6) -- (-0.6,10.6) node[above] {+5 V};
+  \draw (0,0.6) -- (-0.6,0.6) node[ground]{};
+
+  % DS18B20
+  \draw[mod] (8,9.4) rectangle (11.4,10.8);
+  \node[font=\bfseries, above] at (9.7,10.9) {DS18B20};
+  \node[pin, anchor=west] at (8.05,10) {DQ};
+  \node[pin, anchor=east] at (11.35,10.5) {VDD};
+  \node[pin, anchor=east] at (11.35,9.7) {GND};
+  \draw (11.4,10.5) -- (12,10.5) node[right] {+5 V};
+  \draw (11.4,9.7) -- (12,9.7) node[ground]{};
+  \draw (3.2,10) -- (5.5,10) to[short,*-] (8,10);
+  \draw (5.5,10) to[R, l_=4{,}7 k$\Omega$] (5.5,11.8) node[above] {+5 V};
+
+  % DHT11
+  \draw[mod] (8,7.6) rectangle (11.4,8.7);
+  \node[font=\bfseries, above] at (9.7,8.7) {DHT11};
+  \node[pin, anchor=west] at (8.05,8) {DATA};
+  \node[pin, anchor=east] at (11.35,8.4) {VCC};
+  \node[pin, anchor=east] at (11.35,7.85) {GND};
+  \draw (11.4,8.4) -- (12,8.4) node[right] {+5 V};
+  \draw (11.4,7.85) -- (12,7.85) node[ground]{};
+  \draw (3.2,8) -- (8,8);
+
+  % HC-SR04
+  \draw[mod] (8,5.4) rectangle (11.4,7);
+  \node[font=\bfseries, above] at (9.7,7) {HC-SR04};
+  \node[pin, anchor=west] at (8.05,6.4) {Trig};
+  \node[pin, anchor=west] at (8.05,5.8) {Echo};
+  \node[pin, anchor=east] at (11.35,6.4) {VCC};
+  \node[pin, anchor=east] at (11.35,5.8) {GND};
+  \draw (11.4,6.4) -- (12,6.4) node[right] {+5 V};
+  \draw (11.4,5.8) -- (12,5.8) node[ground]{};
+  \draw (3.2,6.4) -- (8,6.4);
+  \draw (3.2,5.8) -- (8,5.8);
+
+  % Divisor LDR
+  \draw (3.2,4) to[short,-*] (6,4) to[phR, l=LDR GL5528] (9,4) node[right] {+5 V};
+  \draw (6,4) to[R, l_=$R_f$ 10 k$\Omega$] (6,2.75) node[ground]{};
+
+  % Adaptador de nivel
+  \draw[mod] (6.8,0.6) rectangle (10.2,2.6);
+  \node[align=center, font=\scriptsize\bfseries] at (8.5,1.6) {Adaptador\\de nivel\\BSS138};
+  \node[pin, anchor=west] at (6.85,2) {HV1};
+  \node[pin, anchor=west] at (6.85,1.4) {HV2};
+  \node[pin, anchor=east] at (10.15,2) {LV1};
+  \node[pin, anchor=east] at (10.15,1.4) {LV2};
+  \draw (7.4,2.6) -- (7.4,3.1) node[above] {+5 V};
+  \node[pin, anchor=north] at (7.4,2.6) {HV};
+  \draw (9.8,2.6) -- (9.8,3.1) node[above] {+3,3 V};
+  \node[pin, anchor=north] at (9.8,2.6) {LV};
+  \draw (8.5,0.6) -- (8.5,0.3) node[ground]{};
+  \draw (3.2,2) -- (6.8,2);
+  \draw (3.2,1.4) -- (6.8,1.4);
+
+  % NodeMCU
+  \draw[mod] (11.6,0) rectangle (14.6,3.4);
+  \node[align=center, font=\bfseries] at (13.1,2.9) {ESP8266};
+  \node[align=center, font=\scriptsize] at (13.1,2.45) {(NodeMCU)};
+  \node[pin, anchor=west] at (11.65,2) {D2 (GPIO4)};
+  \node[pin, anchor=west] at (11.65,1.4) {D1 (GPIO5)};
+  \node[pin, anchor=west] at (11.65,0.6) {GND};
+  \node[pin, anchor=east] at (14.55,1) {3V3};
+  \draw (10.2,2) -- (11.6,2);
+  \draw (10.2,1.4) -- (11.6,1.4);
+  \draw (11.6,0.6) -- (11.1,0.6) node[ground]{};
+  \draw (14.6,1) -- (15.2,1) node[right] {+3,3 V};
+  \node[font=\scriptsize, align=center] at (13.1,-0.5) {Alimentado por USB desde la PC local};
+\end{circuitikz}
+\end{document}

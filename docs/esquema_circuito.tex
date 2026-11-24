@@ -23,7 +23,7 @@
   \draw (11.4,10.5) -- (12,10.5) node[right] {+5 V};
   \draw (11.4,9.7) -- (12,9.7) node[ground]{};
   \draw (3.2,10) -- (5.5,10) to[short,*-] (8,10);
-  \draw (5.5,10) to[R, l_=4{,}7 k$\Omega$] (5.5,11.8) node[above] {+5 V};
+  \draw (5.5,10) to[R, l_=5{,}1 k$\Omega$] (5.5,11.8) node[above] {+5 V};
 
   % DHT11
   \draw[mod] (8,7.6) rectangle (11.4,8.7);
@@ -51,20 +51,10 @@
   \draw (3.2,4) to[short,-*] (6,4) to[phR, l=LDR GL5528] (9,4) node[right] {+5 V};
   \draw (6,4) to[R, l_=$R_f$ 10 k$\Omega$] (6,2.75) node[ground]{};
 
-  % Adaptador de nivel
-  \draw[mod] (6.8,0.6) rectangle (10.2,2.6);
-  \node[align=center, font=\scriptsize\bfseries] at (8.5,1.6) {Adaptador\\de nivel\\BSS138};
-  \node[pin, anchor=west] at (6.85,2) {HV1};
-  \node[pin, anchor=west] at (6.85,1.4) {HV2};
-  \node[pin, anchor=east] at (10.15,2) {LV1};
-  \node[pin, anchor=east] at (10.15,1.4) {LV2};
-  \draw (7.4,2.6) -- (7.4,3.1) node[above] {+5 V};
-  \node[pin, anchor=north] at (7.4,2.6) {HV};
-  \draw (9.8,2.6) -- (9.8,3.1) node[above] {+3,3 V};
-  \node[pin, anchor=north] at (9.8,2.6) {LV};
-  \draw (8.5,0.6) -- (8.5,0.3) node[ground]{};
-  \draw (3.2,2) -- (6.8,2);
-  \draw (3.2,1.4) -- (6.8,1.4);
+  % Bus I2C directo (sin adaptador de nivel): los pull-ups de 10 k$\Omega$ a 5 V estan en la placa del Mega
+  \draw (3.2,2) -- node[above, pin, pos=0.45] {SDA} (11.6,2);
+  \draw (3.2,1.4) -- node[below, pin, pos=0.45] {SCL} (11.6,1.4);
+  \node[font=\scriptsize, align=center] at (7.4,0.45) {I2C directo, 100 kHz, masa común\\(pull-ups de 10 k$\Omega$ a 5 V en el Mega)};
 
   % NodeMCU
   \draw[mod] (11.6,0) rectangle (14.6,3.4);
@@ -73,11 +63,9 @@
   \node[pin, anchor=west] at (11.65,2) {D2 (GPIO4)};
   \node[pin, anchor=west] at (11.65,1.4) {D1 (GPIO5)};
   \node[pin, anchor=west] at (11.65,0.6) {GND};
-  \node[pin, anchor=east] at (14.55,1) {3V3};
-  \draw (10.2,2) -- (11.6,2);
-  \draw (10.2,1.4) -- (11.6,1.4);
+  \node[pin, anchor=east] at (14.55,1) {Vin};
   \draw (11.6,0.6) -- (11.1,0.6) node[ground]{};
-  \draw (14.6,1) -- (15.2,1) node[right] {+3,3 V};
-  \node[font=\scriptsize, align=center] at (13.1,-0.5) {Alimentado por USB desde la PC local};
+  \draw (14.6,1) -- (15.2,1) node[right] {+5 V (pin 5V del Mega)};
+  \node[font=\scriptsize, align=center] at (13.1,-0.5) {Alimentado desde el 5V del Mega (Vin), masa común};
 \end{circuitikz}
 \end{document}

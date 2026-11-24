@@ -16,6 +16,7 @@ const uint8_t CMD_GET_CONFIG = 0x03; // ESP pide los periodos vigentes
 
 const uint8_t N_SENS = 4; // 0 temp, 1 humedad, 2 LDR, 3 distancia
 const uint32_t PERIODO_MIN[N_SENS] = {750, 2000, 10, 60}; // minimo de cada sensor en ms
+const uint32_t PERIODO_MAX = 3600000UL; // maximo para cualquier sensor: 1 hora
 const float RF = 10.0; // resistencia fija del divisor en kOhm (medirla con el tester)
 const unsigned long TIMEOUT_ECO = 25000UL; // espera maxima del eco en us (unos 4 m)
 const bool DEBUG = true; // imprime cada lectura por el monitor serie
@@ -27,7 +28,7 @@ DHT dht(PIN_DHT, DHT11); // objeto del DHT11
 uint32_t periodo[N_SENS] = {1000, 2000, 250, 500}; // periodos iniciales en ms
 uint32_t ultimo[N_SENS] = {0, 0, 0, 0}; // ultima lectura de cada sensor
 float suma[N_SENS] = {0, 0, 0, 0}; // acumulador para el promedio
-uint8_t cuenta[N_SENS] = {0, 0, 0, 0}; // cantidad de muestras acumuladas
+uint16_t cuenta[N_SENS] = {0, 0, 0, 0}; // cantidad de muestras acumuladas (16 bits: la LDR a 10 ms junta 1000 en 10 s)
 
 enum EstadoDS {DS_ESPERANDO, DS_CONVIRTIENDO}; // estados de la lectura del DS18B20
 EstadoDS estado_ds = DS_ESPERANDO; // arranca esperando su turno
@@ -77,7 +78,7 @@ void loop() {
       acumular(0, t); // suma al promedio
       mostrar("DS18B20 [C]", t); // imprime para depurar
     }
-    ultimo[0] = ahora; // marca la lectura
+    ultimo[0] = t_pedido; // el periodo se cuenta desde el pedido, asi la conversion no lo alarga
     estado_ds = DS_ESPERANDO; // vuelve a esperar su turno
   }
 
@@ -126,7 +127,7 @@ float medirDistancia() {
 /* Suma una muestra al promedio del sensor, protegido de la interrupcion del I2C. */
 void acumular(uint8_t i, float x) {
   noInterrupts(); // evita que el I2C lea a mitad de la suma
-  if (cuenta[i] < 255) { // la cuenta viaja en un byte
+  if (cuenta[i] < 65535) { // la cuenta viaja en 2 bytes
     suma[i] += x; // acumula el valor
     cuenta[i]++; // una muestra mas
   }
@@ -143,8 +144,9 @@ void aplicarConfig() {
   interrupts(); // vuelve a habilitar las interrupciones
   if (id >= N_SENS) return; // id invalido, se ignora
   if (p < PERIODO_MIN[id]) p = PERIODO_MIN[id]; // no baja del minimo del sensor
+  if (p > PERIODO_MAX) p = PERIODO_MAX; // ni supera el maximo
+  noInterrupts(); // el I2C no puede leer el periodo a medio escribir
   periodo[id] = p; // aplica el periodo nuevo
-  noInterrupts(); // reinicia el acumulador de ese sensor
   suma[id] = 0; // borra la suma
   cuenta[id] = 0; // borra la cuenta
   interrupts(); // vuelve a habilitar las interrupciones
@@ -171,7 +173,7 @@ void alRecibir(int n) {
 
 /* Callback de I2C cuando el ESP lee: responde segun el ultimo comando recibido. */
 void alPedir() {
-  uint8_t trama[22]; // buffer de salida (maximo 32 en Wire)
+  uint8_t trama[26]; // buffer de salida (maximo 32 en Wire)
   uint8_t largo_tx = 0; // bytes cargados
   if (comando == CMD_GET_CONFIG) { // pide los periodos vigentes
     memcpy(trama, periodo, 16); // 4 periodos uint32
@@ -180,12 +182,13 @@ void alPedir() {
     for (uint8_t i = 0; i < N_SENS; i++) { // un promedio por sensor
       float prom = cuenta[i] ? suma[i] / cuenta[i] : NAN; // NAN si no hubo muestras
       memcpy(&trama[4 * i], &prom, 4); // copia el float
-      trama[16 + i] = cuenta[i]; // cantidad de muestras usadas
+      trama[16 + 2 * i] = cuenta[i] & 0xFF; // cantidad de muestras usadas, byte bajo
+      trama[17 + 2 * i] = cuenta[i] >> 8; // byte alto
       suma[i] = 0; // reinicia el acumulador
       cuenta[i] = 0; // reinicia la cuenta
     }
-    trama[20] = secuencia++; // contador de tramas
-    largo_tx = 21; // largo sin checksum
+    trama[24] = secuencia++; // contador de tramas
+    largo_tx = 25; // largo sin checksum
   }
   uint8_t chk = 0; // checksum simple
   for (uint8_t k = 0; k < largo_tx; k++) chk += trama[k]; // suma de todos los bytes

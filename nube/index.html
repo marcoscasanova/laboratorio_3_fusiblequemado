@@ -1,0 +1,503 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FusibleQuemado · Instrumentación multivariable IoT</title>
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    color-scheme: light;
+    --fondo: #f3f2ef;
+    --superficie: #fcfcfb;
+    --borde: #e2e0da;
+    --texto: #0b0b0b;
+    --texto-2: #52514e;
+    --texto-3: #807e78;
+    --serie: #2a78d6;
+    --banda: rgba(42, 120, 214, 0.16);
+    --muestras: #9ec5f4;
+    --grilla: rgba(0, 0, 0, 0.06);
+    --bueno: #0ca30c; --alerta: #b97a00; --critico: #d03b3b; --neutro: #807e78;
+    --acento: #2a78d6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --fondo: #121211;
+      --superficie: #1a1a19;
+      --borde: #2e2e2c;
+      --texto: #f0efec;
+      --texto-2: #c3c2b7;
+      --texto-3: #8f8e86;
+      --serie: #3987e5;
+      --banda: rgba(57, 135, 229, 0.22);
+      --muestras: #184f95;
+      --grilla: rgba(255, 255, 255, 0.07);
+      --bueno: #0ca30c; --alerta: #fab219; --critico: #e66767; --neutro: #8f8e86;
+      --acento: #3987e5;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--fondo); color: var(--texto); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 1240px; margin: 0 auto; padding: 20px 20px 48px; }
+  h1 { font-size: 22px; margin: 0; letter-spacing: -0.01em; }
+  h2 { font-size: 16px; margin: 0 0 12px; }
+  h3 { font-size: 14px; margin: 0; }
+  a { color: var(--acento); }
+  .tarjeta { background: var(--superficie); border: 1px solid var(--borde); border-radius: 10px; padding: 16px; }
+  .sub { color: var(--texto-2); }
+  .tenue { color: var(--texto-3); font-size: 12px; }
+
+  header.portada { display: flex; flex-wrap: wrap; gap: 12px 32px; align-items: flex-end; justify-content: space-between; margin-bottom: 16px; }
+  header.portada .meta { color: var(--texto-2); font-size: 13px; }
+
+  /* Estado del sistema */
+  .estado { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin-bottom: 16px; }
+  .estado .tarjeta { padding: 12px 14px; }
+  .estado .rotulo { font-size: 12px; color: var(--texto-2); }
+  .estado .valor { font-size: 15px; font-weight: 600; margin-top: 2px; display: flex; align-items: center; gap: 6px; }
+  .punto { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex: none; }
+  .ok .punto { background: var(--bueno); } .ok .icono::before { content: "✓"; color: var(--bueno); }
+  .aviso .punto { background: var(--alerta); } .aviso .icono::before { content: "!"; color: var(--alerta); }
+  .mal .punto { background: var(--critico); } .mal .icono::before { content: "✕"; color: var(--critico); }
+  .nada .punto { background: var(--neutro); } .nada .icono::before { content: "–"; color: var(--neutro); }
+  .icono { font-weight: 700; width: 12px; text-align: center; }
+
+  /* Filtros */
+  .filtros { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin-bottom: 12px; }
+  .grupo { display: inline-flex; border: 1px solid var(--borde); border-radius: 8px; overflow: hidden; }
+  .grupo button { border: 0; background: var(--superficie); color: var(--texto); padding: 6px 12px; font: inherit; cursor: pointer; border-right: 1px solid var(--borde); }
+  .grupo button:last-child { border-right: 0; }
+  .grupo button[aria-pressed="true"] { background: var(--acento); color: #fff; }
+  label.campo { display: inline-flex; align-items: center; gap: 6px; color: var(--texto-2); }
+  input, select { font: inherit; color: var(--texto); background: var(--superficie); border: 1px solid var(--borde); border-radius: 6px; padding: 5px 8px; }
+  button.boton { font: inherit; border: 1px solid var(--borde); background: var(--superficie); color: var(--texto); border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+  button.primario { background: var(--acento); border-color: var(--acento); color: #fff; }
+  button:disabled { opacity: .5; cursor: default; }
+
+  /* Graficos */
+  .graficos { display: grid; grid-template-columns: repeat(auto-fit, minmax(540px, 1fr)); gap: 12px; }
+  @media (max-width: 600px) { .graficos { grid-template-columns: 1fr; } }
+  .graf .cabeza { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 6px; }
+  .graf .ultimo { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .graf .ultimo small { font-size: 13px; font-weight: 400; color: var(--texto-2); }
+  .lienzo { position: relative; height: 210px; }
+  .lienzo.mini { height: 64px; margin-top: 4px; }
+  .pie-graf { display: flex; justify-content: space-between; gap: 8px; margin-top: 4px; }
+
+  /* Configuracion */
+  .config { display: grid; grid-template-columns: minmax(320px, 1fr) minmax(320px, 1.3fr); gap: 12px; margin-top: 16px; }
+  @media (max-width: 900px) { .config { grid-template-columns: 1fr; } }
+  .config .tarjeta { overflow-x: auto; min-width: 0; }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 7px 6px; border-bottom: 1px solid var(--borde); vertical-align: middle; }
+  th { font-weight: 600; color: var(--texto-2); font-size: 12px; }
+  td input[type=number] { width: 110px; }
+  .msg { min-height: 20px; margin-top: 10px; }
+  .msg.error { color: var(--critico); }
+  .situacion { display: inline-flex; align-items: center; gap: 5px; }
+  details { margin-top: 16px; }
+  summary { cursor: pointer; font-weight: 600; }
+  .formulas { color: var(--texto-2); }
+  .formulas code { background: var(--fondo); padding: 1px 5px; border-radius: 4px; }
+  footer { margin-top: 24px; color: var(--texto-3); font-size: 12px; }
+</style>
+</head>
+<body>
+<main>
+  <header class="portada">
+    <div>
+      <div class="tenue">UTEC · ITR Suroeste, Fray Bentos · Ingeniería en Mecatrónica · 2026</div>
+      <h1>Sistema de instrumentación multivariable IoT/IIoT</h1>
+      <div class="sub">Laboratorio Final Integrador · Instrumentación y Medidas Eléctricas · Grupo 06 (FusibleQuemado)</div>
+    </div>
+    <div class="meta">
+      Integrantes: Marcos Casanova, Adriel Castillo, Tiago Corrales<br>
+      Docentes: Daniel Fernández, Rodrigo Sosa, José S. Sasías<br>
+      <a href="https://github.com/marcoscasanova/laboratorio_3_fusiblequemado" target="_blank" rel="noopener">Repositorio en GitHub</a>
+    </div>
+  </header>
+
+  <section class="estado" id="estado" aria-label="Estado del sistema">
+    <div class="tarjeta"><div class="rotulo">Gateway ESP8266</div><div class="valor nada" id="e-gateway"><span class="punto"></span><span>–</span></div></div>
+    <div class="tarjeta"><div class="rotulo">PC local (Nivel 2), último contacto</div><div class="valor nada" id="e-poll"><span class="punto"></span><span>–</span></div></div>
+    <div class="tarjeta"><div class="rotulo">Última confirmación de configuración</div><div class="valor nada" id="e-ack"><span class="icono"></span><span>–</span></div><div class="tenue" id="e-ack-det"></div></div>
+    <div class="tarjeta"><div class="rotulo">Última ventana en la nube</div><div class="valor nada" id="e-ventana"><span class="punto"></span><span>–</span></div><div class="tenue" id="e-subida"></div></div>
+  </section>
+
+  <section aria-label="Mediciones">
+    <div class="filtros">
+      <div class="grupo" role="group" aria-label="Rango de tiempo" id="presets">
+        <button data-h="1">1 h</button><button data-h="6">6 h</button><button data-h="24" aria-pressed="true">24 h</button><button data-h="168">7 días</button>
+      </div>
+      <label class="campo">Desde <input type="datetime-local" id="desde"></label>
+      <label class="campo">Hasta <input type="datetime-local" id="hasta"></label>
+      <button class="boton" id="aplicar-rango">Ver rango</button>
+      <span class="tenue" id="info-rango"></span>
+      <span style="flex:1"></span>
+      <button class="boton" id="csv">Descargar CSV</button>
+    </div>
+    <div class="graficos" id="graficos"></div>
+  </section>
+
+  <section class="config" aria-label="Configuración remota">
+    <div class="tarjeta">
+      <h2>Configuración remota de muestreo</h2>
+      <p class="sub" style="margin:0 0 10px">El comando queda en la nube hasta que la PC local lo consulta (cada 30 s). La PC lo publica por MQTT al ESP8266, que lo escribe por I2C en el Arduino y relee la configuración para confirmarla.</p>
+      <label class="campo" style="margin-bottom:8px">Clave del panel <input type="password" id="clave" autocomplete="current-password" style="width:160px"></label>
+      <table>
+        <thead><tr><th>Sensor</th><th>Vigente</th><th>Nuevo período [ms]</th><th></th></tr></thead>
+        <tbody id="tabla-config"></tbody>
+      </table>
+      <div class="msg" id="msg-config" role="status"></div>
+    </div>
+    <div class="tarjeta">
+      <h2>Últimos comandos</h2>
+      <table>
+        <thead><tr><th>#</th><th>Sensor</th><th>Período</th><th>Situación</th><th>Creado</th><th>Confirmado</th><th>Demora</th></tr></thead>
+        <tbody id="tabla-comandos"><tr><td colspan="7" class="tenue">Sin comandos todavía</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <details class="tarjeta">
+    <summary>Cómo se calculan las bandas de incertidumbre</summary>
+    <div class="formulas">
+      <p>Cada punto es el promedio que calcula el Arduino en una ventana de 10 s; el <em>n</em> de cada ventana se grafica debajo de cada variable. Las bandas muestran el valor ± su incertidumbre: el error de la hoja de datos combinado en cuadratura con la mitad de la resolución. Como ese error es sistemático, no disminuye al promediar.</p>
+      <ul>
+        <li><strong>DS18B20:</strong> <code>δT = √(0,5² + 0,03125²) ≈ 0,50 °C</code> entre −10 y 85 °C (±2 °C fuera de ese rango).</li>
+        <li><strong>DHT11:</strong> <code>δHR = √(5² + 0,5²) ≈ 5,0 %HR</code>.</li>
+        <li><strong>LDR:</strong> <code>R = Rf (1024/N − 1)</code>, propagando <code>δN = 0,5</code> cuentas y la incertidumbre de Rf.</li>
+        <li><strong>HC-SR04:</strong> <code>d = v t / 2</code> con <code>v = 331,3 + 0,606 T</code> y T del DS18B20 de la misma ventana; <code>δd = √((t/2 · 0,606 δT)² + (v/2 · δt)² + δhoja²)</code>.</li>
+        <li><strong>Punto de rocío</strong> (magnitud derivada, Magnus con a = 17,62 y b = 243,12 °C): <code>Td = bγ/(a − γ)</code>, <code>γ = ln(HR/100) + aT/(b + T)</code>, y <code>δTd = √((∂Td/∂T · δT)² + (∂Td/∂HR · δHR)²)</code>.</li>
+      </ul>
+      <p>Si el rango elegido tiene más de 2000 ventanas, se agrupan en intervalos iguales y se promedian ponderando por <em>n</em>.</p>
+    </div>
+  </details>
+
+  <footer>Todos los horarios están en la hora local del navegador. Herramientas: Arduino, ESP8266, Mosquitto, Python, PHP, MySQL y Chart.js (todas de código abierto).</footer>
+</main>
+
+<script src="chart.umd.min.js"></script>
+<script>
+"use strict";
+const API = "api/";
+const SENSORES = ["Temperatura (DS18B20)", "Humedad (DHT11)", "Luminosidad (LDR)", "Distancia (HC-SR04)"];
+const CORTO = ["temperatura", "humedad", "LDR", "distancia"];
+const fmtNum = (x, d) => x == null ? "–" : x.toLocaleString("es-UY", { minimumFractionDigits: d, maximumFractionDigits: d });
+const fmtHora = ms => new Date(ms).toLocaleString("es-UY", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" });
+const fmtHoraCorta = ms => new Date(ms).toLocaleString("es-UY", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+const fmtDia = ms => new Date(ms).toLocaleString("es-UY", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+const ANCHO_EJE_Y = 54; // mismo ancho en el grafico principal y en el de n, para que queden alineados
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+function haceCuanto(ms) {
+  if (ms == null) return "nunca";
+  const s = Math.max(0, Math.round(ms / 1000));
+  if (s < 60) return `hace ${s} s`;
+  if (s < 3600) return `hace ${Math.round(s / 60)} min`;
+  if (s < 86400) return `hace ${(s / 3600).toFixed(1).replace(".", ",")} h`;
+  return `hace ${Math.round(s / 86400)} días`;
+}
+function fmtPeriodo(ms) {
+  if (ms == null) return "–";
+  return ms >= 1000 ? `${fmtNum(ms / 1000, ms % 1000 ? 2 : 0)} s` : `${ms} ms`;
+}
+async function pedir(ruta, opciones) {
+  const r = await fetch(API + ruta, Object.assign({ cache: "no-store" }, opciones));
+  const j = await r.json().catch(() => ({ ok: false, error: `HTTP ${r.status}` }));
+  if (!r.ok || !j.ok) throw new Error(j.error || `HTTP ${r.status}`);
+  return j;
+}
+function guardar(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+function leer(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+
+/* ---------- Graficos ---------- */
+// clave en la respuesta de datos.php, titulo, unidad, decimales, indice de sensor para n (null = derivada)
+const VARIABLES = [
+  { clave: "temp", titulo: "Temperatura", sensor: "DS18B20", unidad: "°C", dec: 2, n: 0 },
+  { clave: "hum", titulo: "Humedad relativa", sensor: "DHT11", unidad: "%HR", dec: 1, n: 1 },
+  { clave: "ldr", titulo: "Luminosidad", sensor: "LDR GL5528, resistencia", unidad: "kΩ", dec: 2, n: 2 },
+  { clave: "dist", titulo: "Distancia", sensor: "HC-SR04, compensada en T", unidad: "cm", dec: 1, n: 3 },
+  { clave: "rocio", titulo: "Punto de rocío", sensor: "magnitud derivada: DS18B20 + DHT11", unidad: "°C", dec: 2, n: null },
+];
+const graficos = {};
+
+function crearTarjetas() {
+  const cont = document.getElementById("graficos");
+  for (const v of VARIABLES) {
+    const t = document.createElement("div");
+    t.className = "tarjeta graf";
+    t.innerHTML = `
+      <div class="cabeza">
+        <div><h3>${v.titulo}</h3><div class="tenue" id="sens-${v.clave}">${v.sensor}</div></div>
+        <div class="ultimo" id="ult-${v.clave}">–</div>
+      </div>
+      <div class="lienzo"><canvas id="c-${v.clave}" role="img" aria-label="${v.titulo} con banda de incertidumbre"></canvas></div>
+      ${v.n == null ? "" : `<div class="lienzo mini"><canvas id="n-${v.clave}" role="img" aria-label="Muestras por ventana de ${v.titulo}"></canvas></div>`}
+      <div class="pie-graf tenue"><span>${v.n == null ? "Banda: propagación en cuadratura de δT y δHR" : "Barras: muestras promediadas en cada ventana (n)"}</span><span id="per-${v.clave}"></span></div>`;
+    cont.appendChild(t);
+  }
+}
+
+function ejeX(desde, hasta, visible) {
+  const largo = hasta - desde;
+  return {
+    type: "linear", min: desde, max: hasta, display: visible, offset: false, // sin margen: las barras quedan alineadas con la linea
+    grid: { color: css("--grilla"), drawTicks: false, offset: false },
+    border: { display: false },
+    ticks: {
+      color: css("--texto-3"), maxRotation: 0, autoSkipPadding: 24, padding: 6, font: { size: 11 },
+      callback: x => largo > 2 * 86400000 ? fmtDia(x) : fmtHoraCorta(x),
+    },
+  };
+}
+
+function armarGraficos(datos) {
+  const desde = datos.desde, hasta = datos.hasta;
+  const filas = conHuecos(datos.filas, datos.agrupado_s);
+  const serie = css("--serie"), banda = css("--banda"), muestras = css("--muestras");
+  for (const v of VARIABLES) {
+    let clave = v.clave, unidad = v.unidad, titulo = v.titulo, sensor = v.sensor;
+    if (v.clave === "ldr" && datos.calibrada_ldr) { clave = "lux"; unidad = "lx"; sensor = "LDR GL5528, calibrada"; }
+    document.getElementById("sens-" + v.clave).textContent = sensor;
+    const pv = filas.map(f => ({ x: f.ts, y: f[clave] ? f[clave][0] : null }));
+    const sup = filas.map(f => ({ x: f.ts, y: f[clave] ? f[clave][0] + f[clave][1] : null }));
+    const inf = filas.map(f => ({ x: f.ts, y: f[clave] ? f[clave][0] - f[clave][1] : null }));
+    const inc = filas.map(f => f[clave] ? f[clave][1] : null);
+
+    const ultima = [...datos.filas].reverse().find(f => f[clave]);
+    document.getElementById("ult-" + v.clave).innerHTML = ultima
+      ? `${fmtNum(ultima[clave][0], v.dec)} <small>± ${fmtNum(ultima[clave][1], v.dec)} ${unidad}</small>` : "–";
+    if (v.n != null) {
+      const ult = datos.filas[datos.filas.length - 1];
+      document.getElementById("per-" + v.clave).textContent = ult ? `período ${fmtPeriodo(ult.p[v.n])} · n = ${ult.n[v.n]}` : "";
+    }
+
+    const cfg = {
+      type: "line",
+      data: { datasets: [
+        { label: "sup", data: sup, borderWidth: 0, pointRadius: 0, pointHoverRadius: 0, fill: false, spanGaps: false },
+        { label: "inf", data: inf, borderWidth: 0, pointRadius: 0, pointHoverRadius: 0, fill: "-1", backgroundColor: banda, spanGaps: false },
+        { label: titulo, data: pv, borderColor: serie, borderWidth: 2, pointRadius: filas.length < 60 ? 2.5 : 0, pointBackgroundColor: serie, pointHoverRadius: 5,
+          pointHoverBackgroundColor: serie, pointHoverBorderColor: css("--superficie"), pointHoverBorderWidth: 2, spanGaps: false, tension: 0 },
+      ] },
+      options: {
+        parsing: false, animation: false, responsive: true, maintainAspectRatio: false,
+        interaction: { mode: "index", axis: "x", intersect: false },
+        scales: {
+          x: ejeX(desde, hasta, v.n == null),
+          y: { grid: { color: css("--grilla"), drawTicks: false }, border: { display: false },
+               afterFit: eje => { eje.width = ANCHO_EJE_Y; },
+               ticks: { color: css("--texto-3"), padding: 6, font: { size: 11 }, maxTicksLimit: 6 },
+               title: { display: true, text: unidad, color: css("--texto-3"), font: { size: 11 } } },
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            filter: it => it.datasetIndex === 2,
+            displayColors: false,
+            callbacks: {
+              title: it => it.length ? fmtHora(it[0].parsed.x) : "",
+              label: it => it.parsed.y == null ? "sin muestras" : ` ${fmtNum(it.parsed.y, v.dec)} ± ${fmtNum(inc[it.dataIndex], v.dec)} ${unidad}`,
+              afterLabel: it => v.n == null ? "" : (filas[it.dataIndex].n ? ` n = ${filas[it.dataIndex].n[v.n]}, período ${fmtPeriodo(filas[it.dataIndex].p[v.n])}` : ""),
+            },
+          },
+        },
+      },
+    };
+    graficos[v.clave]?.destroy();
+    graficos[v.clave] = new Chart(document.getElementById("c-" + v.clave), cfg);
+
+    if (v.n != null) {
+      const nd = filas.map(f => ({ x: f.ts, y: f.n ? f.n[v.n] : null }));
+      const cfgN = {
+        type: "bar",
+        data: { datasets: [{ label: "n", data: nd, backgroundColor: muestras, borderRadius: 2, barPercentage: 1, categoryPercentage: 1, maxBarThickness: 6 }] },
+        options: {
+          parsing: false, animation: false, responsive: true, maintainAspectRatio: false,
+          interaction: { mode: "index", axis: "x", intersect: false },
+          scales: {
+            x: ejeX(desde, hasta, true),
+            y: { beginAtZero: true, grid: { display: false }, border: { display: false }, afterFit: eje => { eje.width = ANCHO_EJE_Y; },
+                 ticks: { color: css("--texto-3"), font: { size: 10 }, maxTicksLimit: 2 } },
+          },
+          plugins: { legend: { display: false }, tooltip: {
+            callbacks: { title: it => it.length ? fmtHora(it[0].parsed.x) : "", label: it => ` n = ${it.parsed.y ?? "–"}` + (datos.agrupado_s ? " (promedio por ventana)" : "") } } },
+        },
+      };
+      graficos["n" + v.clave]?.destroy();
+      graficos["n" + v.clave] = new Chart(document.getElementById("n-" + v.clave), cfgN);
+    }
+  }
+}
+
+// Inserta un punto vacio donde faltan ventanas, para que la linea se corte en vez de unir el hueco
+function conHuecos(filas, agrupado_s) {
+  const paso = Math.max(10, agrupado_s || 10) * 1000;
+  const salida = [];
+  for (let i = 0; i < filas.length; i++) {
+    if (i && filas[i].ts - filas[i - 1].ts > 3 * paso) salida.push({ ts: filas[i - 1].ts + paso });
+    salida.push(filas[i]);
+  }
+  return salida;
+}
+
+/* ---------- Rango de tiempo ---------- */
+let rango = { horas: 24 }; // relativo a ahora (en vivo) o {desde, hasta} fijo
+let ultimosDatos = null;
+const aLocal = ms => { const d = new Date(ms - new Date(ms).getTimezoneOffset() * 60000); return d.toISOString().slice(0, 16); };
+
+function limitesRango() {
+  if (rango.horas) { const h = Date.now(); return [h - rango.horas * 3600000, h]; }
+  return [rango.desde, rango.hasta];
+}
+async function cargarDatos() {
+  const [d, h] = limitesRango();
+  try {
+    const datos = await pedir(`datos.php?desde=${Math.round(d)}&hasta=${Math.round(h)}&max=2000`);
+    ultimosDatos = datos;
+    armarGraficos(datos);
+    document.getElementById("info-rango").textContent = `${datos.ventanas} ventanas` + (datos.agrupado_s ? ` · agrupadas cada ${datos.agrupado_s} s` : "") + (rango.horas ? " · se actualiza cada 30 s" : "");
+  } catch (e) {
+    document.getElementById("info-rango").textContent = "No se pudieron leer los datos: " + e.message;
+  }
+}
+document.getElementById("presets").addEventListener("click", ev => {
+  const b = ev.target.closest("button"); if (!b) return;
+  for (const x of document.querySelectorAll("#presets button")) x.setAttribute("aria-pressed", x === b);
+  rango = { horas: Number(b.dataset.h) };
+  const [d, h] = limitesRango();
+  document.getElementById("desde").value = aLocal(d); document.getElementById("hasta").value = aLocal(h);
+  cargarDatos();
+});
+document.getElementById("aplicar-rango").addEventListener("click", () => {
+  const d = new Date(document.getElementById("desde").value).getTime();
+  const h = new Date(document.getElementById("hasta").value).getTime();
+  if (!(d < h)) { document.getElementById("info-rango").textContent = "El inicio tiene que ser anterior al fin"; return; }
+  for (const x of document.querySelectorAll("#presets button")) x.setAttribute("aria-pressed", "false");
+  rango = { desde: d, hasta: h };
+  cargarDatos();
+});
+document.getElementById("csv").addEventListener("click", () => {
+  if (!ultimosDatos) return;
+  const col = ["temp", "hum", "rocio", "ldr", "lux", "dist"];
+  const cab = ["fecha_hora_local", "ts_ms", ...col.flatMap(c => [c, "inc_" + c]), "n_temp", "n_hum", "n_ldr", "n_dist", "p_temp_ms", "p_hum_ms", "p_ldr_ms", "p_dist_ms"];
+  const lineas = [cab.join(";")];
+  for (const f of ultimosDatos.filas) {
+    lineas.push([new Date(f.ts).toLocaleString("es-UY"), f.ts, ...col.flatMap(c => f[c] ? [f[c][0], f[c][1]] : ["", ""]), ...f.n, ...f.p.map(x => x ?? "")]
+      .map(x => String(x).replace(".", ",")).join(";"));
+  }
+  const url = URL.createObjectURL(new Blob(["﻿" + lineas.join("\r\n")], { type: "text/csv" }));
+  const a = Object.assign(document.createElement("a"), { href: url, download: `fusiblequemado_${aLocal(Date.now()).replace(/[:T]/g, "-")}.csv` });
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+
+/* ---------- Estado y configuracion ---------- */
+let estado = null;
+
+function chip(id, clase, texto) {
+  const el = document.getElementById(id);
+  el.className = "valor " + clase;
+  el.lastElementChild.textContent = texto;
+}
+const ICONO_SIT = { "aplicado": "ok", "fallo": "mal", "enviado": "aviso", "en cola": "aviso", "reemplazado": "nada" };
+
+function pintarEstado(e) {
+  const edad = ts => ts == null ? null : e.ahora - ts;
+  const gw = e.gateway ? e.gateway.valor : null;
+  chip("e-gateway", gw === "online" ? "ok" : gw === "offline" ? "mal" : "nada",
+    gw === "online" ? "En línea" : gw === "offline" ? "Desconectado" : "Sin datos");
+  const ep = edad(e.ultimo_poll);
+  chip("e-poll", ep == null ? "nada" : ep < 90000 ? "ok" : ep < 600000 ? "aviso" : "mal",
+    ep == null ? "Nunca" : (ep < 90000 ? "Activa · " : "Sin contacto · ") + haceCuanto(ep));
+  if (e.ultimo_ack) {
+    const a = e.ultimo_ack;
+    chip("e-ack", a.situacion === "aplicado" ? "ok" : "mal", `${haceCuanto(edad(a.confirmado))} · ${a.situacion}`);
+    document.getElementById("e-ack-det").textContent = `#${a.cmd}: ${CORTO[a.sensor]} → ${fmtPeriodo(a.periodo_ms)}, ${fmtHora(a.confirmado)}`;
+  } else { chip("e-ack", "nada", "Ninguna todavía"); }
+  const ev = edad(e.ultima_ventana);
+  chip("e-ventana", ev == null ? "nada" : ev < 900000 ? "ok" : "aviso", ev == null ? "Sin datos" : haceCuanto(ev));
+  document.getElementById("e-subida").textContent = e.ultima_subida ? `Última subida de la PC: ${fmtHora(e.ultima_subida)}` : "";
+
+  // Tabla de configuracion: se arma una vez y despues solo se actualiza la columna "Vigente"
+  const cuerpo = document.getElementById("tabla-config");
+  if (!cuerpo.children.length) {
+    SENSORES.forEach((nombre, i) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${nombre}</td><td id="vig-${i}">–</td>
+        <td><input type="number" id="nuevo-${i}" min="${e.periodo_min[i]}" max="${e.periodo_max}" step="1" placeholder="mín. ${e.periodo_min[i]}"></td>
+        <td><button class="boton primario" data-sensor="${i}">Aplicar</button></td>`;
+      cuerpo.appendChild(tr);
+    });
+  }
+  SENSORES.forEach((_, i) => {
+    document.getElementById("vig-" + i).textContent = e.periodos_vigentes ? fmtPeriodo(e.periodos_vigentes[i]) : "–";
+  });
+
+  const tc = document.getElementById("tabla-comandos");
+  if (e.comandos.length) {
+    tc.innerHTML = e.comandos.map(c => {
+      const demora = c.confirmado ? Math.max(0, (c.confirmado - c.creado) / 1000) : null; // el ack lleva la hora de la PC: con relojes desfasados podria dar negativo
+      return `<tr><td>${c.cmd}</td><td>${CORTO[c.sensor]}</td><td>${fmtPeriodo(c.periodo_ms)}</td>
+        <td><span class="situacion ${ICONO_SIT[c.situacion] || "nada"}"><span class="icono"></span>${c.situacion}</span></td>
+        <td>${fmtHora(c.creado)}</td><td>${c.confirmado ? fmtHora(c.confirmado) : "–"}</td>
+        <td>${demora == null ? "–" : demora < 60 ? fmtNum(demora, 1) + " s" : fmtNum(demora / 60, 1) + " min"}</td></tr>`;
+    }).join("");
+  }
+}
+
+async function cargarEstado() {
+  try { estado = await pedir("estado.php"); pintarEstado(estado); }
+  catch (e) { chip("e-poll", "mal", "No se pudo leer el estado"); }
+}
+
+document.getElementById("tabla-config").addEventListener("click", async ev => {
+  const b = ev.target.closest("button[data-sensor]"); if (!b) return;
+  const i = Number(b.dataset.sensor);
+  const msg = document.getElementById("msg-config");
+  const valor = Number(document.getElementById("nuevo-" + i).value);
+  const clave = document.getElementById("clave").value;
+  msg.className = "msg";
+  if (!Number.isInteger(valor) || valor < estado.periodo_min[i] || valor > estado.periodo_max) {
+    msg.className = "msg error";
+    msg.textContent = `El período de ${CORTO[i]} tiene que ser un entero entre ${estado.periodo_min[i]} y ${estado.periodo_max} ms.`;
+    return;
+  }
+  b.disabled = true;
+  try {
+    const r = await pedir("comando.php", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sensor: i, periodo_ms: valor, clave }) });
+    guardar("fq_clave", clave);
+    msg.textContent = `Comando #${r.cmd} en cola: ${CORTO[i]} → ${fmtPeriodo(valor)}. La PC local lo toma en menos de 30 s.`;
+    seguirComando();
+  } catch (e) {
+    msg.className = "msg error";
+    msg.textContent = "No se pudo enviar: " + e.message;
+  } finally { b.disabled = false; }
+});
+
+// Despues de un comando se consulta el estado cada 3 s durante 2 min para ver la confirmacion enseguida
+let seguimiento = null;
+function seguirComando() {
+  clearInterval(seguimiento);
+  const fin = Date.now() + 120000;
+  cargarEstado();
+  seguimiento = setInterval(() => { cargarEstado(); if (Date.now() > fin) clearInterval(seguimiento); }, 3000);
+}
+
+/* ---------- Arranque ---------- */
+Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+Chart.defaults.color = css("--texto-2");
+crearTarjetas();
+document.getElementById("clave").value = leer("fq_clave") || "";
+{ const [d, h] = limitesRango(); document.getElementById("desde").value = aLocal(d); document.getElementById("hasta").value = aLocal(h); }
+cargarEstado();
+cargarDatos();
+setInterval(cargarEstado, 15000);
+setInterval(() => { if (rango.horas) cargarDatos(); }, 30000);
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if (ultimosDatos) armarGraficos(ultimosDatos); });
+</script>
+</body>
+</html>
